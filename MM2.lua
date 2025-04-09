@@ -1,4 +1,4 @@
--- Carica la libreria OrionLib 
+-- Carica la libreria OrionLib
 local OrionLib = loadstring(game:HttpGet(('https://raw.githubusercontent.com/jensonhirst/Orion/main/source')))()
 
 -- Crea la finestra con parametri avanzati e tema blu
@@ -25,7 +25,7 @@ local Window = OrionLib:MakeWindow({
 })
 
 -------------------------------------------
--- TAB OP + LOGICA AUTO KILL + Aimbot
+-- TAB OP + LOGICA AUTO KILL
 -------------------------------------------
 local opTab = Window:MakeTab({
     Name = "OP",
@@ -33,11 +33,13 @@ local opTab = Window:MakeTab({
     PremiumOnly = false
 })
 
+-- Variabili Auto Kill
 local autoKillEnabled = false
-local aimbotEnabled = false -- Variabile per attivare/disattivare l'aimbot
+local allPlayersKilled = false
 local runService = game:GetService("RunService")
 local virtualInput = game:GetService("VirtualInputManager")
 
+-- Funzione per equipaggiare il coltello
 local function EquipKnife()
     local char = game.Players.LocalPlayer.Character
     local backpack = game.Players.LocalPlayer:FindFirstChild("Backpack")
@@ -47,6 +49,7 @@ local function EquipKnife()
     end
 end
 
+-- Funzione per fare click M1
 local function ClickM1()
     virtualInput:SendMouseButtonEvent(0, 0, 0, true, game, 0)
     wait(0.1)
@@ -56,11 +59,14 @@ end
 -- Loop Auto Kill: si attacca al bersaglio finché non è morto
 task.spawn(function()
     while true do
-        if autoKillEnabled then
+        if autoKillEnabled and not allPlayersKilled then
             local localPlayer = game.Players.LocalPlayer
             local players = game:GetService("Players"):GetPlayers()
+            local playersRemaining = 0
+
             for _, target in ipairs(players) do
                 if target ~= localPlayer and target.Character and target.Character:FindFirstChild("HumanoidRootPart") then
+                    playersRemaining = playersRemaining + 1
                     local char = localPlayer.Character
                     if char and char:FindFirstChild("HumanoidRootPart") then
                         EquipKnife()
@@ -70,82 +76,53 @@ task.spawn(function()
                             wait(0.2)
                             ClickM1()
                             wait(0.8)
+                            -- Verifica se il coltello è ancora equipaggiato
+                            if not char:FindFirstChild("Knife") then
+                                autoKillEnabled = false  -- Disattiva Auto Kill se il coltello non è più in mano
+                                break
+                            end
                         end
                     end
                 end
+            end
+
+            -- Se non ci sono più giocatori da uccidere, ferma il loop
+            if playersRemaining == 0 then
+                allPlayersKilled = true
+                OrionLib:MakeNotification({
+                    Name = "Auto Kill",
+                    Content = "Tutti i giocatori sono stati uccisi!",
+                    Image = "rbxassetid://6031098406",
+                    Time = 3
+                })
+                autoKillEnabled = false -- Disattiva Auto Kill
             end
         end
         wait(1)
     end
 end)
 
-opTab:AddToggle({
+-- Bottone per attivare/disattivare Auto Kill
+opTab:AddButton({
     Name = "Auto Kill All",
-    Default = false,
-    Callback = function(value)
-        autoKillEnabled = value
-        if not autoKillEnabled then
-            -- Assicurati che il clic M1 venga disattivato quando Auto Kill è disattivato
+    Callback = function()
+        if not allPlayersKilled then
+            autoKillEnabled = true
+            allPlayersKilled = false
             OrionLib:MakeNotification({
                 Name = "Auto Kill",
-                Content = "Disattivato",
+                Content = "Inizio Auto Kill",
                 Image = "rbxassetid://6031098406",
                 Time = 3
             })
         else
             OrionLib:MakeNotification({
                 Name = "Auto Kill",
-                Content = "Attivato",
+                Content = "Tutti i giocatori sono già stati uccisi.",
                 Image = "rbxassetid://6031098406",
                 Time = 3
             })
         end
-    end
-})
-
--- Aimbot: usando RenderStepped per aggiornamenti continui
-runService.RenderStepped:Connect(function(deltaTime)
-    if aimbotEnabled then
-        local localPlayer = game.Players.LocalPlayer
-        local localChar = localPlayer.Character
-        if localChar and localChar:FindFirstChild("HumanoidRootPart") then
-            local localPos = localChar.HumanoidRootPart.Position
-            local closestPlayer = nil
-            local shortestDistance = math.huge
-            
-            for _, plr in pairs(game.Players:GetPlayers()) do
-                if plr ~= localPlayer and plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") then
-                    local distance = (plr.Character.HumanoidRootPart.Position - localPos).Magnitude
-                    if distance < shortestDistance then
-                        shortestDistance = distance
-                        closestPlayer = plr
-                    end
-                end
-            end
-            
-            if closestPlayer then
-                local targetPos = closestPlayer.Character.HumanoidRootPart.Position
-                local currentCF = localChar.HumanoidRootPart.CFrame
-                local targetCF = CFrame.new(currentCF.Position, targetPos)
-                local smoothFactor = 0.2
-                local newCF = currentCF:Lerp(targetCF, smoothFactor)
-                localChar.HumanoidRootPart.CFrame = newCF
-            end
-        end
-    end
-end)
-
-opTab:AddToggle({
-    Name = "Aimbot",
-    Default = false,
-    Callback = function(value)
-        aimbotEnabled = value
-        OrionLib:MakeNotification({
-            Name = "Aimbot",
-            Content = value and "Aimbot Attivato" or "Aimbot Disattivato",
-            Image = "rbxassetid://6031098406",
-            Time = 3
-        })
     end
 })
 
@@ -156,6 +133,7 @@ local espEnabled = false
 local espFolder = Instance.new("Folder", game.CoreGui)
 espFolder.Name = "CipherX_ESP"
 
+-- Funzione per creare ESP
 local function createESP(player, role)
     local tag = Instance.new("BillboardGui")
     tag.Name = "ESP_Tag"
@@ -174,12 +152,14 @@ local function createESP(player, role)
     tag.Parent = espFolder
 end
 
+-- Funzione per rimuovere ESP
 local function removeAllESP()
     for _, v in pairs(espFolder:GetChildren()) do
         v:Destroy()
     end
 end
 
+-- Funzione per aggiornare ESP
 local function updateESP()
     removeAllESP()
     for _, player in pairs(game.Players:GetPlayers()) do
@@ -209,6 +189,7 @@ task.spawn(function()
     end
 end)
 
+-- Toggle per ESP
 opTab:AddToggle({
     Name = "ESP Murder/Sheriff",
     Default = false,
@@ -224,7 +205,7 @@ opTab:AddToggle({
 })
 
 -------------------------------------------
--- TAB PLAYER (Teleport) con aggiornamento automatico
+-- TAB PLAYER (Visualizzazione)
 -------------------------------------------
 local playerTab = Window:MakeTab({
     Name = "Player",
@@ -232,88 +213,66 @@ local playerTab = Window:MakeTab({
     PremiumOnly = false
 })
 
-local function TeleportToPlayer(playerName)
-    local player = game:GetService("Players"):FindFirstChild(playerName)
-    if player and player.Character then
-        local localChar = game.Players.LocalPlayer.Character
-        local targetChar = player.Character
-        if localChar and localChar:FindFirstChild("HumanoidRootPart") and targetChar:FindFirstChild("HumanoidRootPart") then
-            localChar.HumanoidRootPart.CFrame = targetChar.HumanoidRootPart.CFrame
+local selectedPlayer = nil
+
+-- Funzione per aggiornare la lista dei giocatori
+local function UpdatePlayerList()
+    local playerList = {}
+    for _, player in ipairs(game.Players:GetPlayers()) do
+        if player ~= game.Players.LocalPlayer then
+            table.insert(playerList, player.Name)
         end
-    else
-        local playerList = game:GetService("Players"):GetPlayers()
-        local playerNames = {}
-        for _, p in pairs(playerList) do
-            table.insert(playerNames, p.Name)
-        end
-        OrionLib:MakeNotification({
-            Name = "Available Players",
-            Content = "Current players: " .. table.concat(playerNames, ", "),
-            Image = "rbxassetid://6031098406",
-            Time = 5
-        })
-        OrionLib:MakeNotification({
-            Name = "Error",
-            Content = "Player not found.",
-            Image = "rbxassetid://6031098406",
-            Time = 3
-        })
     end
+    return playerList
 end
 
-local function GetPlayerList()
-    local playersList = {}
-    for _, player in pairs(game:GetService("Players"):GetPlayers()) do
-        table.insert(playersList, player.Name)
+-- Combo Box per selezionare il giocatore
+playerTab:AddDropdown({
+    Name = "Select Player",
+    Options = UpdatePlayerList(),
+    Default = "None",
+    Callback = function(selected)
+        if selected ~= "None" then
+            selectedPlayer = game.Players:FindFirstChild(selected)
+        else
+            selectedPlayer = nil
+        end
     end
-    return playersList
-end
+})
 
-local selectedPlayerName = "CipherX"
-local teleportDropdown
-
--- Creazione iniziale del dropdown
-teleportDropdown = playerTab:AddDropdown({
-    Name = "Seleziona Giocatore",
-    Default = selectedPlayerName,
-    Options = GetPlayerList(),
+-- Toggle per vedere la visuale del giocatore selezionato
+playerTab:AddToggle({
+    Name = "Visuale del Giocatore Selezionato",
+    Default = false,
     Callback = function(value)
-        selectedPlayerName = value
+        if value and selectedPlayer then
+            local camera = game.Workspace.CurrentCamera
+            camera.CameraSubject = selectedPlayer.Character:WaitForChild("Head")
+            camera.CameraType = Enum.CameraType.Attach
+            OrionLib:MakeNotification({
+                Name = "Camera",
+                Content = "Visuale impostata su " .. selectedPlayer.Name,
+                Image = "rbxassetid://6031098406",
+                Time = 3
+            })
+        else
+            local camera = game.Workspace.CurrentCamera
+            camera.CameraType = Enum.CameraType.Custom
+            camera.CameraSubject = game.Players.LocalPlayer.Character:WaitForChild("Humanoid")
+            OrionLib:MakeNotification({
+                Name = "Camera",
+                Content = "Visuale ripristinata",
+                Image = "rbxassetid://6031098406",
+                Time = 3
+            })
+        end
     end
 })
 
-playerTab:AddButton({
-    Name = "Teleport to Player",
-    Callback = function()
-        TeleportToPlayer(selectedPlayerName)
-    end
-})
-
--- Aggiornamento automatico del dropdown ogni 5 secondi
+-- Aggiorna la lista dei giocatori
 task.spawn(function()
     while true do
+        playerTab:UpdateDropdownOptions(UpdatePlayerList())
         wait(5)
-        local updatedList = GetPlayerList()
-        -- Se il dropdown supporta l'aggiornamento diretto, usalo
-        if teleportDropdown and teleportDropdown.SetOptions then
-            teleportDropdown:SetOptions(updatedList)
-        else
-            -- Se non supporta, ricrea il dropdown (questo cancella gli altri elementi nel tab!)
-            playerTab:Clear()
-            teleportDropdown = playerTab:AddDropdown({
-                Name = "Seleziona Giocatore",
-                Default = selectedPlayerName,
-                Options = updatedList,
-                Callback = function(value)
-                    selectedPlayerName = value
-                end
-            })
-            playerTab:AddButton({
-                Name = "Teleport to Player",
-                Callback = function()
-                    TeleportToPlayer(selectedPlayerName)
-                end
-            })
-        end
     end
 end)
